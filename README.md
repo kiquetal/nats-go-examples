@@ -91,6 +91,70 @@ You can configure the applications using:
    - `APP_ENV`: Application environment (dev, test, prod)
    - `APP_LOG_LEVEL`: Log level (debug, info, warn, error)
 
+## Running with Docker
+
+### 1. Building Docker Images
+
+From the root directory of the project, build the Docker images for the publisher and subscriber:
+
+```bash
+# Build publisher image
+docker build -t nats-publisher -f cmd/publisher/Dockerfile .
+
+# Build subscriber image
+docker build -t nats-subscriber -f cmd/subscriber/Dockerfile .
+```
+
+### 2. Running the Containers
+
+Make sure your NATS server is running first, then start the containers:
+
+```bash
+# Run subscriber container
+docker run --network host -e NATS_URL=nats://localhost:4222 nats-subscriber
+
+# Run publisher container
+docker run --network host -e NATS_URL=nats://localhost:4222 nats-publisher
+```
+
+### 3. Docker Compose (Optional)
+
+You can also use Docker Compose to run the entire system. Create a docker-compose.yml file at the root of the project:
+
+```yaml
+version: '3'
+services:
+  nats:
+    image: nats:latest
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    
+  publisher:
+    build:
+      context: .
+      dockerfile: cmd/publisher/Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - nats
+    
+  subscriber:
+    build:
+      context: .
+      dockerfile: cmd/subscriber/Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - nats
+```
+
+Then run:
+
+```bash
+docker-compose up -d
+```
+
 ## Code Examples
 
 ### Publisher Example
