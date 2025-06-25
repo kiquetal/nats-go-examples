@@ -1,0 +1,11 @@
+{
+  "environment": "development",
+  "logLevel": "debug",
+  "nats": {
+    "url": "nats://localhost:4222",
+    "allowReconnect": true,
+    "maxReconnect": 10,
+    "reconnectWait": 5
+  }
+}
+
