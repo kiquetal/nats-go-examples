@@ -40,3 +40,4 @@ jobs:
       with:
         name: nats-go-examples-binaries
         path: bin/
+        if-no-files-found: error  # Fail if no files are found to upload
