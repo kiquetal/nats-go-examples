@@ -20,44 +20,14 @@ const (
 	tokenSubject = "token.request"
 )
 
-func main() {
-	// Parse command-line flags
-	configPath := flag.String("config", "", "Path to config file")
-	idpURL := flag.String("idp-url", "https://idp.example.com", "IDP base URL")
-	flag.Parse()
-
-	// Load configuration
-	appConfig, err := config.LoadConfig(*configPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Create logger
-	log := logger.DefaultLogger("token-worker")
-	log.Info("Starting token worker")
-
-	// Create IDP client
-	idpClient := idp.NewClient(*idpURL)
-	log.Info("IDP client created for %s", *idpURL)
-
-	// Connect to NATS
-	natsConn, err := nats.Connect(appConfig.NATS.URL)
-	if err != nil {
-		log.Fatal("Failed to connect to NATS: %v", err)
-	}
-	defer natsConn.Close()
-
-	log.Info("Connected to NATS at %s", appConfig.NATS.URL)
-	log.Info("Subscribing to token requests on %s", tokenSubject)
-
-	// Subscribe to token requests
-	_, err = natsConn.Subscribe(tokenSubject, func(msg *nats.Msg) {
+// createTokenRequestHandler returns a callback function for processing token requests
+func createTokenRequestHandler(idpClient *idp.Client, log *logger.Logger) nats.MsgHandler {
+	return func(msg *nats.Msg) {
 		// Parse the token request
 		var request models.TokenRequest
 		if err := json.Unmarshal(msg.Data, &request); err != nil {
 			log.Error("Failed to parse token request: %v", err)
-			sendErrorResponse(msg, request.RequestID, "Invalid request format")
+			sendErrorResponse(msg, "", "Invalid request format")
 			return
 		}
 
@@ -105,8 +75,43 @@ func main() {
 		}
 
 		log.Info("Sent token response for request ID: %s", request.RequestID)
-	})
+	}
+}
 
+func main() {
+	// Parse command-line flags
+	configPath := flag.String("config", "", "Path to config file")
+	idpURL := flag.String("idp-url", "https://idp.example.com", "IDP base URL")
+	flag.Parse()
+
+	// Load configuration
+	appConfig, err := config.LoadConfig(*configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create logger
+	log := logger.DefaultLogger("token-worker")
+	log.Info("Starting token worker")
+
+	// Create IDP client
+	idpClient := idp.NewClient(*idpURL)
+	log.Info("IDP client created for %s", *idpURL)
+
+	// Connect to NATS
+	natsConn, err := nats.Connect(appConfig.NATS.URL)
+	if err != nil {
+		log.Fatal("Failed to connect to NATS: %v", err)
+	}
+	defer natsConn.Close()
+
+	log.Info("Connected to NATS at %s", appConfig.NATS.URL)
+	log.Info("Subscribing to token requests on %s", tokenSubject)
+
+	// Create the token request handler and subscribe to the token subject
+	handler := createTokenRequestHandler(idpClient, log)
+	_, err = natsConn.Subscribe(tokenSubject, handler)
 	if err != nil {
 		log.Fatal("Failed to subscribe to token requests: %v", err)
 	}
