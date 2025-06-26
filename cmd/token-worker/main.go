@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/kiquetal/nats-go-examples/internal/config"
 	"github.com/kiquetal/nats-go-examples/internal/idp"
@@ -99,14 +101,47 @@ func main() {
 	idpClient := idp.NewClient(*idpURL)
 	log.Info("IDP client created for %s", *idpURL)
 
-	// Connect to NATS
-	natsConn, err := nats.Connect(appConfig.NATS.URL)
+	// Create a WaitGroup to track when connection is ready
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	// Configure connection options
+	opts := []nats.Option{
+		nats.Name("Token Worker"),           // Set client name
+		nats.ReconnectWait(5 * time.Second), // Wait 5 seconds between reconnect attempts
+		nats.MaxReconnects(10),              // Try to reconnect up to 10 times
+		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
+			log.Warn("Disconnected from NATS: %v", err)
+		}),
+		nats.ReconnectHandler(func(nc *nats.Conn) {
+			log.Info("Reconnected to NATS server at %s", nc.ConnectedUrl())
+		}),
+		nats.ErrorHandler(func(nc *nats.Conn, sub *nats.Subscription, err error) {
+			log.Error("NATS error: %v", err)
+		}),
+		nats.ClosedHandler(func(nc *nats.Conn) {
+			log.Warn("NATS connection closed")
+		}),
+		// The most important handler - signals when the connection is established
+		nats.ConnectHandler(func(nc *nats.Conn) {
+			log.Info("Connected to NATS at %s", nc.ConnectedUrl())
+			// Signal that we're connected
+			wg.Done()
+		}),
+	}
+
+	// Connect to NATS with options
+	log.Info("Connecting to NATS at %s...", appConfig.NATS.URL)
+	natsConn, err := nats.Connect(appConfig.NATS.URL, opts...)
 	if err != nil {
 		log.Fatal("Failed to connect to NATS: %v", err)
 	}
 	defer natsConn.Close()
 
-	log.Info("Connected to NATS at %s", appConfig.NATS.URL)
+	// Wait for the connection to be established
+	wg.Wait()
+	log.Info("NATS connection established successfully")
+
 	log.Info("Subscribing to token requests on %s", tokenSubject)
 
 	// Create the token request handler and subscribe to the token subject
