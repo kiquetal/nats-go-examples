@@ -134,6 +134,163 @@ spec:
 EOF
 ```
 
+## Helm Chart Installation (Recommended)
+
+The NATS Helm charts provide the most flexible and maintainable way to deploy NATS on Kubernetes.
+
+### Adding the NATS Helm Repository
+
+```bash
+helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+helm repo update
+```
+
+### Basic NATS Server Installation
+
+```bash
+helm install my-nats nats/nats --version 0.22.0 \
+  --set nats.jetstream.enabled=true \
+  --set nats.jetstream.fileStorage.enabled=true \
+  --set nats.jetstream.fileStorage.size=10Gi
+```
+
+### Production-Ready Installation
+
+For production environments with clustering, monitoring and security:
+
+```bash
+helm install nats nats/nats --version 0.22.0 -f - <<EOF
+nats:
+  image: nats:2.10.0-alpine
+  jetstream:
+    enabled: true
+    memStorage:
+      enabled: true
+      size: 2Gi
+    fileStorage:
+      enabled: true
+      size: 10Gi
+      storageClassName: ssd
+  
+  # Cluster configuration
+  cluster:
+    enabled: true
+    replicas: 3
+    
+  # Authentication
+  auth:
+    enabled: true
+    basic:
+      users:
+        - user: admin
+          password: admin_password
+          permissions:
+            publish: ">"
+            subscribe: ">"
+        - user: token_service
+          password: service_password
+          permissions:
+            publish: "token.*"
+            subscribe: "token.*"
+            
+  # TLS configuration
+  tls:
+    enabled: true
+    secretName: nats-server-tls
+    
+  # Resource allocation
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+      
+# Prometheus metrics exporter
+exporter:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    
+# Prometheus and Grafana stack
+prometheus:
+  enabled: true
+  
+grafana:
+  enabled: true
+  dashboards:
+    enabled: true
+    
+# Pod disruption budget
+pdb:
+  enabled: true
+  minAvailable: 2
+EOF
+```
+
+### Customizing Storage for JetStream
+
+For optimized JetStream performance with specific storage class:
+
+```bash
+helm install nats nats/nats -f - <<EOF
+nats:
+  jetstream:
+    enabled: true
+    fileStorage:
+      enabled: true
+      size: 50Gi
+      storageClassName: fast-ssd
+      storageDirectory: /data/jetstream
+EOF
+```
+
+### Providing TLS Certificates
+
+```bash
+# Create TLS secrets first
+kubectl create secret tls nats-server-tls \
+  --cert=/path/to/tls.crt \
+  --key=/path/to/tls.key
+
+# Then reference in Helm chart
+helm install nats nats/nats --set nats.tls.enabled=true --set nats.tls.secretName=nats-server-tls
+```
+
+### Upgrading NATS Helm Deployment
+
+```bash
+helm repo update
+helm upgrade nats nats/nats --version 0.22.0 -f values.yaml
+```
+
+### Installing with Custom Values File
+
+Create a `values.yaml` file with your configuration:
+
+```yaml
+nats:
+  image: nats:2.10.0-alpine
+  jetstream:
+    enabled: true
+    fileStorage:
+      enabled: true
+      size: 10Gi
+  auth:
+    enabled: true
+    basic:
+      users:
+        - user: app
+          password: password
+```
+
+Then install using:
+
+```bash
+helm install nats nats/nats -f values.yaml
+```
+
 ## Security Best Practices
 
 1. **Enable TLS for Client and Cluster connections**:
