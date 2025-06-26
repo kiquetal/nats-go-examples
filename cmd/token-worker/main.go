@@ -13,12 +13,11 @@ import (
 	"github.com/kiquetal/nats-go-examples/internal/idp"
 	"github.com/kiquetal/nats-go-examples/internal/logger"
 	"github.com/kiquetal/nats-go-examples/pkg/models"
-	"github.com/kiquetal/nats-go-examples/pkg/pubsub"
+	"github.com/nats-io/nats.go"
 )
 
 const (
-	tokenRequestSubject  = "token.request"
-	tokenResponseSubject = "token.response"
+	tokenSubject = "token.request"
 )
 
 func main() {
@@ -43,28 +42,23 @@ func main() {
 	log.Info("IDP client created for %s", *idpURL)
 
 	// Connect to NATS
-	subscriber, err := pubsub.NewSubscriber(appConfig.NATS.URL)
+	natsConn, err := nats.Connect(appConfig.NATS.URL)
 	if err != nil {
 		log.Fatal("Failed to connect to NATS: %v", err)
 	}
-	defer subscriber.Close()
-
-	publisher, err := pubsub.NewPublisher(appConfig.NATS.URL)
-	if err != nil {
-		log.Fatal("Failed to create NATS publisher: %v", err)
-	}
-	defer publisher.Close()
+	defer natsConn.Close()
 
 	log.Info("Connected to NATS at %s", appConfig.NATS.URL)
-	log.Info("Listening for token requests on %s", tokenRequestSubject)
+	log.Info("Subscribing to token requests on %s", tokenSubject)
 
 	// Subscribe to token requests
-	_, err = subscriber.Subscribe(tokenRequestSubject, func(subject string, data []byte) error {
+	_, err = natsConn.Subscribe(tokenSubject, func(msg *nats.Msg) {
 		// Parse the token request
 		var request models.TokenRequest
-		if err := json.Unmarshal(data, &request); err != nil {
+		if err := json.Unmarshal(msg.Data, &request); err != nil {
 			log.Error("Failed to parse token request: %v", err)
-			return err
+			sendErrorResponse(msg, request.RequestID, "Invalid request format")
+			return
 		}
 
 		log.Info("Received token request for client ID: %s (Request ID: %s)",
@@ -84,38 +78,40 @@ func main() {
 		tokenResp, err := idpClient.SimulateTokenRetrieval(credentials)
 		if err != nil {
 			log.Error("Failed to obtain token: %v", err)
-			response = models.NewErrorResponse(request.RequestID, err.Error())
-		} else {
-			log.Info("Token obtained for client ID: %s", request.ClientID)
-			response = models.NewTokenResponse(
-				request.RequestID,
-				tokenResp.AccessToken,
-				tokenResp.TokenType,
-				tokenResp.ExpiresIn,
-			)
+			sendErrorResponse(msg, request.RequestID, err.Error())
+			return
 		}
+
+		log.Info("Token obtained for client ID: %s", request.ClientID)
+		response = models.NewTokenResponse(
+			request.RequestID,
+			tokenResp.AccessToken,
+			tokenResp.TokenType,
+			tokenResp.ExpiresIn,
+		)
 
 		// Marshal the response
 		respData, err := json.Marshal(response)
 		if err != nil {
 			log.Error("Failed to marshal token response: %v", err)
-			return err
+			sendErrorResponse(msg, request.RequestID, "Internal server error")
+			return
 		}
 
-		// Publish the response
-		err = publisher.Publish(tokenResponseSubject, respData)
-		if err != nil {
-			log.Error("Failed to publish token response: %v", err)
-			return err
+		// Reply to the request
+		if err := msg.Respond(respData); err != nil {
+			log.Error("Failed to send response: %v", err)
+			return
 		}
 
-		log.Info("Published token response for request ID: %s", request.RequestID)
-		return nil
+		log.Info("Sent token response for request ID: %s", request.RequestID)
 	})
 
 	if err != nil {
 		log.Fatal("Failed to subscribe to token requests: %v", err)
 	}
+
+	log.Info("Token worker is running. Press Ctrl+C to exit.")
 
 	// Wait for termination signal
 	signals := make(chan os.Signal, 1)
@@ -123,4 +119,15 @@ func main() {
 	<-signals
 
 	log.Info("Received shutdown signal, exiting...")
+}
+
+// sendErrorResponse sends an error response back to the requester
+func sendErrorResponse(msg *nats.Msg, requestID, errorMessage string) {
+	response := models.NewErrorResponse(requestID, errorMessage)
+	respData, err := json.Marshal(response)
+	if err != nil {
+		// Just log, can't do much else here
+		return
+	}
+	msg.Respond(respData)
 }
