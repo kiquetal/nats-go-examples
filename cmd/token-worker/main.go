@@ -20,6 +20,7 @@ import (
 
 const (
 	tokenSubject = "token.request"
+	defaultQueue = "token-workers"
 )
 
 // createTokenRequestHandler returns a callback function for processing token requests
@@ -84,6 +85,7 @@ func main() {
 	// Parse command-line flags
 	configPath := flag.String("config", "", "Path to config file")
 	idpURL := flag.String("idp-url", "https://idp.example.com", "IDP base URL")
+	queueName := flag.String("queue", defaultQueue, "Queue group name for load balancing")
 	flag.Parse()
 
 	// Load configuration
@@ -142,16 +144,16 @@ func main() {
 	wg.Wait()
 	log.Info("NATS connection established successfully")
 
-	log.Info("Subscribing to token requests on %s", tokenSubject)
+	log.Info("Subscribing to token requests on %s with queue group %s", tokenSubject, *queueName)
 
-	// Create the token request handler and subscribe to the token subject
+	// Create the token request handler and subscribe to the token subject with queue group
 	handler := createTokenRequestHandler(idpClient, log)
-	_, err = natsConn.Subscribe(tokenSubject, handler)
+	_, err = natsConn.QueueSubscribe(tokenSubject, *queueName, handler)
 	if err != nil {
 		log.Fatal("Failed to subscribe to token requests: %v", err)
 	}
 
-	log.Info("Token worker is running. Press Ctrl+C to exit.")
+	log.Info("Token worker is running in queue group %s. Press Ctrl+C to exit.", *queueName)
 
 	// Wait for termination signal
 	signals := make(chan os.Signal, 1)
