@@ -27,6 +27,34 @@ type Client struct {
 	baseURL       string
 	tokenEndpoint string
 	httpClient    *http.Client
+	logger        Logger
+}
+
+// Logger interface for dependency injection of any logger
+type Logger interface {
+	Debug(format string, args ...interface{})
+	Info(format string, args ...interface{})
+	Warn(format string, args ...interface{})
+	Error(format string, args ...interface{})
+}
+
+// DefaultLogger provides a simple logger that prints to stdout
+type DefaultLogger struct{}
+
+func (l *DefaultLogger) Debug(format string, args ...interface{}) {
+	fmt.Printf("[DEBUG] [IDP] "+format+"\n", args...)
+}
+
+func (l *DefaultLogger) Info(format string, args ...interface{}) {
+	fmt.Printf("[INFO] [IDP] "+format+"\n", args...)
+}
+
+func (l *DefaultLogger) Warn(format string, args ...interface{}) {
+	fmt.Printf("[WARN] [IDP] "+format+"\n", args...)
+}
+
+func (l *DefaultLogger) Error(format string, args ...interface{}) {
+	fmt.Printf("[ERROR] [IDP] "+format+"\n", args...)
 }
 
 // ClientCredentials holds the credentials for a client
@@ -50,6 +78,13 @@ func WithTokenEndpoint(path string) ClientOption {
 func WithTimeout(timeout time.Duration) ClientOption {
 	return func(c *Client) {
 		c.httpClient.Timeout = timeout
+	}
+}
+
+// WithLogger sets a custom logger
+func WithLogger(logger Logger) ClientOption {
+	return func(c *Client) {
+		c.logger = logger
 	}
 }
 
@@ -77,6 +112,7 @@ func NewClient(baseURL string, options ...ClientOption) *Client {
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
+		logger: &DefaultLogger{},
 	}
 
 	// Apply options
@@ -114,6 +150,9 @@ func (c *Client) GetTokenWithClientCredentials(credentials *ClientCredentials) (
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
+	// Log the request
+	c.logger.Debug("Sending request to IDP: %s %s", req.Method, req.URL.String())
+
 	// Send request
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -126,6 +165,9 @@ func (c *Client) GetTokenWithClientCredentials(credentials *ClientCredentials) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
+
+	// Log the response
+	c.logger.Debug("Received response from IDP: %d %s", resp.StatusCode, string(body))
 
 	// Check for error response
 	if resp.StatusCode != http.StatusOK {
