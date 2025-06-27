@@ -85,9 +85,20 @@ func main() {
 	// Parse command-line flags
 	configPath := flag.String("config", "", "Path to config file")
 	idpURL := flag.String("idp-url", "https://idp.example.com", "IDP base URL")
+	idpTokenPath := flag.String("idp-token-path", "/realms/phoenix/protocol/openid-connect/token", "IDP token endpoint path")
 	queueName := flag.String("queue", defaultQueue, "Queue group name for load balancing")
 	nameSuffix := flag.String("name-suffix", "", "Suffix to append to the client name (e.g. pod name)")
 	flag.Parse()
+
+	// Override IDP URL with environment variable if present
+	if envIdpURL := os.Getenv("IDP_URL"); envIdpURL != "" {
+		*idpURL = envIdpURL
+	}
+
+	// Override token path with environment variable if present
+	if envTokenPath := os.Getenv("IDP_TOKEN_PATH"); envTokenPath != "" {
+		*idpTokenPath = envTokenPath
+	}
 
 	// Load configuration
 	appConfig, err := config.LoadConfig(*configPath)
@@ -100,9 +111,9 @@ func main() {
 	log := logger.DefaultLogger("token-worker")
 	log.Info("Starting token worker")
 
-	// Create IDP client
-	idpClient := idp.NewClient(*idpURL)
-	log.Info("IDP client created for %s", *idpURL)
+	// Create IDP client with custom token endpoint
+	idpClient := idp.NewClient(*idpURL, idp.WithTokenEndpoint(*idpTokenPath))
+	log.Info("IDP client created for %s with token path %s", *idpURL, *idpTokenPath)
 
 	// Create a WaitGroup to track when connection is ready
 	var wg sync.WaitGroup

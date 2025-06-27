@@ -23,24 +23,51 @@ type TokenResponse struct {
 
 // Client represents an IDP client for obtaining tokens
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL       string
+	tokenEndpoint string
+	httpClient    *http.Client
 }
 
 // ClientCredentials holds the credentials for a client
 type ClientCredentials struct {
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
+	Scope        string `json:"scope,omitempty"` // Added scope field
 }
 
-// NewClient creates a new IDP client
-func NewClient(baseURL string) *Client {
-	return &Client{
-		baseURL: baseURL,
+// ClientOption represents a function that modifies a Client
+type ClientOption func(*Client)
+
+// WithTokenEndpoint sets a custom token endpoint path
+func WithTokenEndpoint(path string) ClientOption {
+	return func(c *Client) {
+		c.tokenEndpoint = path
+	}
+}
+
+// WithTimeout sets a custom HTTP timeout
+func WithTimeout(timeout time.Duration) ClientOption {
+	return func(c *Client) {
+		c.httpClient.Timeout = timeout
+	}
+}
+
+// NewClient creates a new IDP client with the provided options
+func NewClient(baseURL string, options ...ClientOption) *Client {
+	client := &Client{
+		baseURL:       baseURL,
+		tokenEndpoint: "/oauth2/token", // Default token endpoint
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
 	}
+
+	// Apply options
+	for _, option := range options {
+		option(client)
+	}
+
+	return client
 }
 
 // GetTokenWithClientCredentials obtains a token using client credentials
@@ -51,9 +78,16 @@ func (c *Client) GetTokenWithClientCredentials(credentials *ClientCredentials) (
 	formData.Set("client_id", credentials.ClientID)
 	formData.Set("client_secret", credentials.ClientSecret)
 
+	// Add scope if provided
+	if credentials.Scope != "" {
+		formData.Set("scope", credentials.Scope)
+	}
+
+	// Create full token endpoint URL
+	tokenURL := fmt.Sprintf("%s%s", c.baseURL, c.tokenEndpoint)
+
 	// Create request
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/oauth2/token", c.baseURL),
-		strings.NewReader(formData.Encode()))
+	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(formData.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -96,9 +130,16 @@ func (c *Client) SimulateTokenRetrieval(credentials *ClientCredentials) (*TokenR
 	// Simulate network delay
 	time.Sleep(200 * time.Millisecond)
 
+	// Include scope in response if provided
+	var scope string
+	if credentials.Scope != "" {
+		scope = credentials.Scope
+	}
+
 	return &TokenResponse{
 		AccessToken: fakeToken,
 		TokenType:   "Bearer",
 		ExpiresIn:   3600, // 1 hour
+		Scope:       scope,
 	}, nil
 }
