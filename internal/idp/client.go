@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -52,11 +53,27 @@ func WithTimeout(timeout time.Duration) ClientOption {
 	}
 }
 
+// Configuration constants
+const (
+	DefaultBaseURL       = "https://idp.example.com"
+	DefaultTokenEndpoint = "/realms/phoenix/protocol/openid-connect/token"
+)
+
 // NewClient creates a new IDP client with the provided options
 func NewClient(baseURL string, options ...ClientOption) *Client {
+	// Check for environment variable overrides
+	if envURL := os.Getenv("IDP_URL"); envURL != "" {
+		baseURL = envURL
+	}
+
+	tokenEndpoint := DefaultTokenEndpoint
+	if envTokenPath := os.Getenv("IDP_TOKEN_PATH"); envTokenPath != "" {
+		tokenEndpoint = envTokenPath
+	}
+
 	client := &Client{
 		baseURL:       baseURL,
-		tokenEndpoint: "/oauth2/token", // Default token endpoint
+		tokenEndpoint: tokenEndpoint,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
