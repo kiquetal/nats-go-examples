@@ -149,9 +149,9 @@ helm repo update
 
 ```bash
 helm install my-nats nats/nats --version 0.22.0 \
-  --set nats.jetstream.enabled=true \
-  --set nats.jetstream.fileStorage.enabled=true \
-  --set nats.jetstream.fileStorage.size=10Gi
+  --set jetstream.enabled=true \
+  --set jetstream.fileStorage.enabled=true \
+  --set jetstream.fileStorage.size=10Gi
 ```
 
 ### Production-Ready Installation
