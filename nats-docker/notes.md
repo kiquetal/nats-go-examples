@@ -149,9 +149,9 @@ helm repo update
 
 ```bash
 helm install my-nats nats/nats --version 0.22.0 \
-  --set jetstream.enabled=true \
-  --set jetstream.fileStorage.enabled=true \
-  --set jetstream.fileStorage.size=10Gi
+  --set config.jetstream.enabled=true \
+  --set config.jetstream.fileStorage.enabled=true \
+  --set config.jetstream.fileStorage.size=10Gi
 ```
 
 ### Production-Ready Installation
@@ -170,19 +170,17 @@ cluster:
   enabled: true
   replicas: 3
   
-jetstream:
-  enabled: true
-  memStorage:
+config:
+  jetstream:
     enabled: true
-    size: 2Gi
-  fileStorage:
-    enabled: true
-    size: 10Gi
-    storageClassName: ssd
-
-auth:
-  enabled: true
-  basic:
+    memStorage:
+      enabled: true
+      size: 2Gi
+    fileStorage:
+      enabled: true
+      size: 10Gi
+      storageClassName: ssd
+  authorization:
     users:
       - user: admin
         password: admin_password
@@ -195,9 +193,9 @@ auth:
           publish: "token.*"
           subscribe: "token.*"
           
-tls:
-  enabled: true
-  secretName: nats-server-tls
+  tls:
+    enabled: true
+    secretName: nats-server-tls
   
 resources:
   requests:
@@ -232,13 +230,14 @@ For optimized JetStream performance with specific storage class:
 
 ```bash
 helm install nats nats/nats -f - <<EOF
-jetstream:
-  enabled: true
-  fileStorage:
+config:
+  jetstream:
     enabled: true
-    size: 50Gi
-    storageClassName: fast-ssd
-    storageDirectory: /data/jetstream
+    fileStorage:
+      enabled: true
+      size: 50Gi
+      storageClassName: fast-ssd
+      storageDirectory: /data/jetstream
 EOF
 ```
 
@@ -251,7 +250,7 @@ kubectl create secret tls nats-server-tls \
   --key=/path/to/tls.key
 
 # Then reference in Helm chart
-helm install nats nats/nats --set tls.enabled=true --set tls.secretName=nats-server-tls
+helm install nats nats/nats --set config.tls.enabled=true --set config.tls.secretName=nats-server-tls
 ```
 
 ### Upgrading NATS Helm Deployment
@@ -266,24 +265,24 @@ helm upgrade nats nats/nats --version 0.22.0 -f values.yaml
 Create a `values.yaml` file with your configuration:
 
 ```yaml
-global:
-  image:
-    registry: docker.io
-    repository: nats
-    tag: "2.10.0-alpine"
-
-jetstream:
-  enabled: true
-  fileStorage:
+config:
+  cluster:
     enabled: true
-    size: 10Gi
-
-auth:
-  enabled: true
-  basic:
+    replicas: 3
+  
+  jetstream:
+    enabled: true
+    fileStorage:
+      enabled: true
+      size: 10Gi
+      
+  authorization:
     users:
       - user: app
         password: password
+        permissions:
+          publish: "token.*"
+          subscribe: "token.*"
 ```
 
 Then install using:
