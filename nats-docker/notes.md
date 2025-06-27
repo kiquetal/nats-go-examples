@@ -232,14 +232,13 @@ For optimized JetStream performance with specific storage class:
 
 ```bash
 helm install nats nats/nats -f - <<EOF
-nats:
-  jetstream:
+jetstream:
+  enabled: true
+  fileStorage:
     enabled: true
-    fileStorage:
-      enabled: true
-      size: 50Gi
-      storageClassName: fast-ssd
-      storageDirectory: /data/jetstream
+    size: 50Gi
+    storageClassName: fast-ssd
+    storageDirectory: /data/jetstream
 EOF
 ```
 
@@ -252,7 +251,7 @@ kubectl create secret tls nats-server-tls \
   --key=/path/to/tls.key
 
 # Then reference in Helm chart
-helm install nats nats/nats --set nats.tls.enabled=true --set nats.tls.secretName=nats-server-tls
+helm install nats nats/nats --set tls.enabled=true --set tls.secretName=nats-server-tls
 ```
 
 ### Upgrading NATS Helm Deployment
@@ -267,19 +266,24 @@ helm upgrade nats nats/nats --version 0.22.0 -f values.yaml
 Create a `values.yaml` file with your configuration:
 
 ```yaml
-nats:
-  image: nats:2.10.0-alpine
-  jetstream:
+global:
+  image:
+    registry: docker.io
+    repository: nats
+    tag: "2.10.0-alpine"
+
+jetstream:
+  enabled: true
+  fileStorage:
     enabled: true
-    fileStorage:
-      enabled: true
-      size: 10Gi
-  auth:
-    enabled: true
-    basic:
-      users:
-        - user: app
-          password: password
+    size: 10Gi
+
+auth:
+  enabled: true
+  basic:
+    users:
+      - user: app
+        password: password
 ```
 
 Then install using:
