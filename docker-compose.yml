@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  nats:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nats-server
+    ports:
+      - "4222:4222"  # Client connections
+      - "8222:8222"  # HTTP monitoring
+      - "6222:6222"  # Clustering
+    volumes:
+      - nats-data:/data
+      - nats-config:/etc/nats
+    restart: unless-stopped
+    networks:
+      - nats-network
+
+  brain-app:
+    build:
+      context: ..
+      dockerfile: cmd/brain-app/Dockerfile
+    container_name: brain-app
+    ports:
+      - "8080:8080"  # HTTP API port
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - nats
+    networks:
+      - nats-network
+
+  token-worker:
+    build:
+      context: ..
+      dockerfile: cmd/token-worker/Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+      - POD_NAME=token-worker-1
+    command: ["-name-suffix", "token-worker-1", "-queue", "token-workers"]
+    depends_on:
+      - nats
+    networks:
+      - nats-network
+    
+  # Add more token workers for testing load balancing
+  token-worker-2:
+    build:
+      context: ..
+      dockerfile: cmd/token-worker/Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+      - POD_NAME=token-worker-2
+    command: ["-name-suffix", "token-worker-2", "-queue", "token-workers"]
+    depends_on:
+      - nats
+    networks:
+      - nats-network
+
+networks:
+  nats-network:
+    driver: bridge
+
+volumes:
+  nats-data:
+  nats-config:

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 )
 
 // NATSConfig represents NATS-specific configuration options
@@ -82,6 +84,12 @@ func applyEnvironmentOverrides(config *AppConfig) {
 	// Override NATS URL if specified
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
 		config.NATS.URL = natsURL
+	} else if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		// Special case for Docker Desktop: if we're running on macOS or Windows,
+		// and connecting from the host to a container, replace localhost with host.docker.internal
+		if strings.Contains(config.NATS.URL, "localhost") {
+			config.NATS.URL = strings.Replace(config.NATS.URL, "localhost", "host.docker.internal", 1)
+		}
 	}
 
 	// Override NATS credentials if specified
