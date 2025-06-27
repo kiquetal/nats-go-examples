@@ -2,7 +2,7 @@
 package idp
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -103,8 +103,11 @@ func (c *Client) GetTokenWithClientCredentials(credentials *ClientCredentials) (
 	// Create full token endpoint URL
 	tokenURL := fmt.Sprintf("%s%s", c.baseURL, c.tokenEndpoint)
 
-	// Create request
-	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(formData.Encode()))
+	// Create request with context and timeout
+	ctx, cancel := context.WithTimeout(context.Background(), c.httpClient.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(formData.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
