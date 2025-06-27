@@ -160,60 +160,58 @@ For production environments with clustering, monitoring and security:
 
 ```bash
 helm install nats nats/nats --version 0.22.0 -f - <<EOF
-nats:
-  image: nats:2.10.0-alpine
-  jetstream:
-    enabled: true
-    memStorage:
-      enabled: true
-      size: 2Gi
-    fileStorage:
-      enabled: true
-      size: 10Gi
-      storageClassName: ssd
+global:
+  image:
+    registry: docker.io
+    repository: nats
+    tag: "2.10.0-alpine"
+    
+cluster:
+  enabled: true
+  replicas: 3
   
-  # Cluster configuration
-  cluster:
+jetstream:
+  enabled: true
+  memStorage:
     enabled: true
-    replicas: 3
+    size: 2Gi
+  fileStorage:
+    enabled: true
+    size: 10Gi
+    storageClassName: ssd
+
+auth:
+  enabled: true
+  basic:
+    users:
+      - user: admin
+        password: admin_password
+        permissions:
+          publish: ">"
+          subscribe: ">"
+      - user: token_service
+        password: service_password
+        permissions:
+          publish: "token.*"
+          subscribe: "token.*"
+          
+tls:
+  enabled: true
+  secretName: nats-server-tls
+  
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1
+    memory: 1Gi
     
-  # Authentication
-  auth:
-    enabled: true
-    basic:
-      users:
-        - user: admin
-          password: admin_password
-          permissions:
-            publish: ">"
-            subscribe: ">"
-        - user: token_service
-          password: service_password
-          permissions:
-            publish: "token.*"
-            subscribe: "token.*"
-            
-  # TLS configuration
-  tls:
-    enabled: true
-    secretName: nats-server-tls
-    
-  # Resource allocation
-  resources:
-    requests:
-      cpu: 200m
-      memory: 256Mi
-    limits:
-      cpu: 1
-      memory: 1Gi
-      
-# Prometheus metrics exporter
-exporter:
+metrics:
   enabled: true
   serviceMonitor:
     enabled: true
     
-# Prometheus and Grafana stack
 prometheus:
   enabled: true
   
@@ -222,8 +220,7 @@ grafana:
   dashboards:
     enabled: true
     
-# Pod disruption budget
-pdb:
+podDisruptionBudget:
   enabled: true
   minAvailable: 2
 EOF
