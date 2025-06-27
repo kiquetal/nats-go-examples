@@ -86,6 +86,7 @@ func main() {
 	configPath := flag.String("config", "", "Path to config file")
 	idpURL := flag.String("idp-url", "https://idp.example.com", "IDP base URL")
 	queueName := flag.String("queue", defaultQueue, "Queue group name for load balancing")
+	nameSuffix := flag.String("name-suffix", "", "Suffix to append to the client name (e.g. pod name)")
 	flag.Parse()
 
 	// Load configuration
@@ -107,9 +108,23 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	// Create a client name that includes the pod name if available
+	clientName := "Token Worker"
+	if *nameSuffix != "" {
+		clientName = fmt.Sprintf("%s-%s", clientName, *nameSuffix)
+	} else {
+		// Try to get pod name from environment variable
+		if podName := os.Getenv("POD_NAME"); podName != "" {
+			clientName = fmt.Sprintf("%s-%s", clientName, podName)
+		} else if hostname, err := os.Hostname(); err == nil {
+			// Fall back to hostname if pod name is not available
+			clientName = fmt.Sprintf("%s-%s", clientName, hostname)
+		}
+	}
+
 	// Configure connection options
 	opts := []nats.Option{
-		nats.Name("Token Worker"),           // Set client name
+		nats.Name(clientName),               // Set client name with unique identifier
 		nats.ReconnectWait(5 * time.Second), // Wait 5 seconds between reconnect attempts
 		nats.MaxReconnects(10),              // Try to reconnect up to 10 times
 		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {

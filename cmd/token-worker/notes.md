@@ -14,6 +14,54 @@ When running multiple replicas in Kubernetes, having unique client names improve
 - Troubleshooting connection issues
 - Proper client tracking in NATS server
 
+## Running Locally
+
+### Using Command Line Flags
+
+```bash
+# Run with default settings
+go run cmd/token-worker/main.go
+
+# Run with custom configuration file
+go run cmd/token-worker/main.go -config configs/custom.json
+
+# Run with specified queue group and name suffix
+go run cmd/token-worker/main.go -queue custom-workers -name-suffix worker1
+
+# Run with IDP URL specified
+go run cmd/token-worker/main.go -idp-url https://my-idp.example.com
+```
+
+### Using Environment Variables
+
+```bash
+# Run with environment variables
+NATS_URL=nats://localhost:4222 QUEUE_GROUP=token-workers WORKER_NAME_SUFFIX=worker1 go run cmd/token-worker/main.go
+
+# Run multiple workers with different identifiers (in separate terminals)
+NATS_URL=nats://localhost:4222 WORKER_NAME_SUFFIX=worker1 LOG_LEVEL=debug IDP_URL=https://idp.example.com go run cmd/token-worker/main.go
+NATS_URL=nats://localhost:4222 WORKER_NAME_SUFFIX=worker2 LOG_LEVEL=debug IDP_URL=https://idp.example.com go run cmd/token-worker/main.go
+
+# Run with multiple environment variables
+NATS_URL=nats://localhost:4222 \
+QUEUE_GROUP=token-workers \
+WORKER_NAME_SUFFIX=worker1 \
+LOG_LEVEL=debug \
+TOKEN_SUBJECT=token.request \
+IDP_URL=https://idp.example.com \
+go run cmd/token-worker/main.go
+```
+
+Available environment variables:
+- `NATS_URL`: NATS server URL (default: nats://localhost:4222)
+- `QUEUE_GROUP`: NATS queue group name (default: token-workers)
+- `WORKER_NAME_SUFFIX`: Suffix to append to the worker name for uniqueness
+- `LOG_LEVEL`: Logging level (debug, info, warn, error) (default: info)
+- `TOKEN_SUBJECT`: NATS subject for token requests (default: token.request)
+- `MAX_RECONNECT`: Maximum reconnect attempts (default: 10)
+- `RECONNECT_WAIT`: Wait time between reconnects in seconds (default: 5)
+- `IDP_URL`: URL of the Identity Provider service (default: https://idp.example.com)
+
 ## Deployment Steps
 
 ### 1. Create a ConfigMap for Application Configuration
@@ -33,6 +81,10 @@ data:
         "allowReconnect": true,
         "maxReconnect": 10,
         "reconnectWait": 5
+      },
+      "idp": {
+        "url": "https://idp.example.com",
+        "timeout": 30
       }
     }
 ```
@@ -65,6 +117,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: IDP_URL
+          value: "https://idp.example.com"
         command:
         - "/app/token-worker"
         args:
@@ -74,6 +128,8 @@ spec:
         - "token-workers"
         - "-name-suffix"
         - "$(POD_NAME)"
+        - "-idp-url"
+        - "$(IDP_URL)"
         volumeMounts:
         - name: config-volume
           mountPath: /app/configs
@@ -118,6 +174,10 @@ opts := []nats.Option{
    - Final NATS client names will appear as: "Token Worker-token-worker-5d4f9b8c7d"
    - This format makes it easy to identify which pod corresponds to which NATS client
 
+4. **IDP Configuration**:
+   - The Identity Provider URL can be configured via env var or command-line flag
+   - In production, consider using secure methods to provide the IDP URL
+
 ## Monitoring
 
 To verify each worker has a unique client name:
@@ -142,3 +202,4 @@ kubectl scale deployment token-worker --replicas=5
 2. Use consistent queue group names across all replicas
 3. Set reasonable reconnect settings for Kubernetes environment
 4. Consider using Pod Disruption Budgets (PDB) to maintain service during cluster operations
+5. Properly configure IDP timeout settings based on expected response times
