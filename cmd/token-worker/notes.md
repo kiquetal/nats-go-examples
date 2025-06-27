@@ -39,8 +39,8 @@ go run cmd/token-worker/main.go -idp-url https://my-idp.example.com
 NATS_URL=nats://localhost:4222 QUEUE_GROUP=token-workers WORKER_NAME_SUFFIX=worker1 go run cmd/token-worker/main.go
 
 # Run multiple workers with different identifiers (in separate terminals)
-NATS_URL=nats://localhost:4222 WORKER_NAME_SUFFIX=worker1 LOG_LEVEL=debug IDP_URL=https://idp.example.com go run cmd/token-worker/main.go
-NATS_URL=nats://localhost:4222 WORKER_NAME_SUFFIX=worker2 LOG_LEVEL=debug IDP_URL=https://idp.example.com go run cmd/token-worker/main.go
+NATS_URL=nats://localhost:4222 WORKER_NAME_SUFFIX=worker1 LOG_LEVEL=debug IDP_URL=https://idp.example.com IDP_TOKEN_PATH="/realms/phoenix/protocol/openid-connect/token" go run cmd/token-worker/main.go
+NATS_URL=nats://localhost:4222 WORKER_NAME_SUFFIX=worker2 LOG_LEVEL=debug IDP_URL=https://idp.example.com IDP_TOKEN_PATH="/realms/phoenix/protocol/openid-connect/token" go run cmd/token-worker/main.go
 
 # Run with multiple environment variables
 NATS_URL=nats://localhost:4222 \
@@ -49,6 +49,7 @@ WORKER_NAME_SUFFIX=worker1 \
 LOG_LEVEL=debug \
 TOKEN_SUBJECT=token.request \
 IDP_URL=https://idp.example.com \
+IDP_TOKEN_PATH="/realms/phoenix/protocol/openid-connect/token" \
 go run cmd/token-worker/main.go
 ```
 
@@ -61,6 +62,8 @@ Available environment variables:
 - `MAX_RECONNECT`: Maximum reconnect attempts (default: 10)
 - `RECONNECT_WAIT`: Wait time between reconnects in seconds (default: 5)
 - `IDP_URL`: URL of the Identity Provider service (default: https://idp.example.com)
+- `IDP_TOKEN_PATH`: Path to token endpoint (default: /realms/phoenix/protocol/openid-connect/token)
+- `POD_NAME`: Pod name for Kubernetes deployments (used for unique client naming)
 
 ## Deployment Steps
 
