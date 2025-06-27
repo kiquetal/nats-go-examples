@@ -14,13 +14,15 @@ This repository contains examples of using NATS messaging system with Go program
 ├── api/                   # API definitions
 ├── cmd/                   # Application entry points
 │   ├── publisher/         # Publisher executable
-│   └── subscriber/        # Subscriber executable
+│   ├── subscriber/        # Subscriber executable
+│   └── brain-app/         # Token management service
 ├── configs/               # Configuration files
 │   └── app.json           # Example application config
 ├── docs/                  # Documentation files
 ├── internal/              # Private application code
 │   ├── config/            # Configuration management
-│   └── logger/            # Logging functionality
+│   ├── logger/            # Logging functionality
+│   └── cache/             # Token caching
 ├── nats-docker/           # Docker setup for NATS server
 │   ├── docker-compose.yml # Docker Compose configuration
 │   └── Dockerfile         # NATS server Dockerfile
@@ -59,6 +61,9 @@ go run cmd/subscriber/main.go -config configs/app.json
 
 # Specifying subject and queue group
 go run cmd/subscriber/main.go -subject orders.new -queue order-processors
+
+# Using environment variables
+NATS_URL=nats://localhost:4222 APP_ENV=dev APP_LOG_LEVEL=debug go run cmd/subscriber/main.go
 ```
 
 ### 3. Run the Publisher
@@ -74,9 +79,30 @@ go run cmd/publisher/main.go -config configs/app.json
 
 # Customizing subject and publish interval (milliseconds)
 go run cmd/publisher/main.go -subject orders.new -interval 2000
+
+# Using environment variables
+NATS_URL=nats://localhost:4222 APP_ENV=dev APP_LOG_LEVEL=debug go run cmd/publisher/main.go
 ```
 
-### 4. Configuration Options
+### 4. Run the Brain App
+
+The brain app serves as a token management service that uses NATS to communicate with token workers:
+
+```bash
+# Using default settings
+go run cmd/brain-app/main.go
+
+# Specifying port and request timeout
+go run cmd/brain-app/main.go -port 8080 -request-timeout 5
+
+# Using environment variables
+NATS_URL=nats://localhost:4222 PORT=8080 REQUEST_TIMEOUT=5 go run cmd/brain-app/main.go
+
+# Using a custom configuration file
+go run cmd/brain-app/main.go -config configs/brain-app.json
+```
+
+### 5. Configuration Options
 
 You can configure the applications using:
 
@@ -86,10 +112,14 @@ You can configure the applications using:
    - `-subject`: Subject to publish/subscribe to
    - `-interval`: Publishing interval (publisher only)
    - `-queue`: Queue group name (subscriber only)
+   - `-port`: HTTP port (brain-app only)
+   - `-request-timeout`: NATS request timeout in seconds (brain-app only)
 3. **Environment variables**:
    - `NATS_URL`: NATS server URL
    - `APP_ENV`: Application environment (dev, test, prod)
    - `APP_LOG_LEVEL`: Log level (debug, info, warn, error)
+   - `PORT`: HTTP server port (brain-app only)
+   - `REQUEST_TIMEOUT`: NATS request timeout in seconds (brain-app only)
 
 ## Running with Docker
 
@@ -103,6 +133,9 @@ docker build -t nats-publisher -f cmd/publisher/Dockerfile .
 
 # Build subscriber image
 docker build -t nats-subscriber -f cmd/subscriber/Dockerfile .
+
+# Build brain-app image
+docker build -t brain-app -f cmd/brain-app/Dockerfile .
 ```
 
 ### 2. Running the Containers
@@ -115,6 +148,9 @@ docker run --network host -e NATS_URL=nats://localhost:4222 nats-subscriber
 
 # Run publisher container
 docker run --network host -e NATS_URL=nats://localhost:4222 nats-publisher
+
+# Run brain-app container
+docker run --network host -e NATS_URL=nats://localhost:4222 -e PORT=8080 brain-app
 ```
 
 ### 3. Docker Compose (Optional)
@@ -145,6 +181,19 @@ services:
       dockerfile: cmd/subscriber/Dockerfile
     environment:
       - NATS_URL=nats://nats:4222
+    depends_on:
+      - nats
+      
+  brain-app:
+    build:
+      context: .
+      dockerfile: cmd/brain-app/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PORT=8080
+      - REQUEST_TIMEOUT=5
     depends_on:
       - nats
 ```
@@ -202,10 +251,24 @@ defer sub.Unsubscribe()
 select {}
 ```
 
+### Brain App Token Request Example
+
+```bash
+# Request a token using curl
+curl -X POST http://localhost:8080/token \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "client_id": "example-client",
+    "client_secret": "example-secret"
+  }'
+```
+
 ## Key Concepts Demonstrated
 
 - Simple Publish/Subscribe
 - Queue Groups for load balancing
+- Request-Reply pattern for token service
+- Token caching to reduce NATS traffic
 - Configuration management
 - Structured logging
 - Graceful shutdown handling

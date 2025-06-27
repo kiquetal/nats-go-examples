@@ -73,7 +73,9 @@ The Brain App is a service that works as an intelligent proxy for obtaining toke
 - `-port`: HTTP server port (default: 8080)
 - `-request-timeout`: Timeout for NATS requests in seconds (default: 5)
 
-## Example Usage
+## Running Locally
+
+### Using Command Line Flags
 
 ```bash
 # Start the Brain App with default settings
@@ -81,6 +83,35 @@ go run cmd/brain-app/main.go
 
 # Start with custom configuration
 go run cmd/brain-app/main.go -config configs/custom.json -port 9090 -request-timeout 10
+```
+
+### Using Environment Variables
+
+```bash
+# Run with environment variables
+NATS_URL=nats://localhost:4222 PORT=8080 REQUEST_TIMEOUT=5 CACHE_TTL=3600 go run cmd/brain-app/main.go
+
+# Run with mix of environment variables and flags
+NATS_URL=nats://custom-nats:4222 LOG_LEVEL=debug go run cmd/brain-app/main.go -port 9090
+```
+
+Available environment variables:
+- `NATS_URL`: NATS server URL (default: nats://localhost:4222)
+- `PORT`: HTTP server port (default: 8080)
+- `REQUEST_TIMEOUT`: Timeout for NATS requests in seconds (default: 5)
+- `CACHE_TTL`: Token cache TTL in seconds (default: 3300)
+- `LOG_LEVEL`: Logging level (debug, info, warn, error) (default: info)
+- `TOKEN_SUBJECT`: NATS subject for token requests (default: token.request)
+
+### Running the Token Worker
+
+```bash
+# Run token worker with environment variables
+NATS_URL=nats://localhost:4222 QUEUE_GROUP=token-workers go run cmd/token-worker/main.go
+
+# Run multiple workers for load balancing (in separate terminals)
+NATS_URL=nats://localhost:4222 WORKER_ID=worker-1 go run cmd/token-worker/main.go
+NATS_URL=nats://localhost:4222 WORKER_ID=worker-2 go run cmd/token-worker/main.go
 ```
 
 ## API Endpoints
@@ -125,6 +156,16 @@ docker build -t brain-app:latest -f cmd/brain-app/Dockerfile .
 
 # Run the container
 docker run -p 8080:8080 -e NATS_URL=nats://nats-server:4222 brain-app:latest
+
+# Run with all environment variables
+docker run -p 8080:8080 \
+  -e NATS_URL=nats://nats-server:4222 \
+  -e PORT=8080 \
+  -e REQUEST_TIMEOUT=5 \
+  -e CACHE_TTL=3600 \
+  -e LOG_LEVEL=info \
+  -e TOKEN_SUBJECT=token.request \
+  brain-app:latest
 ```
 
 ## Production Considerations
