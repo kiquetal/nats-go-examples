@@ -205,6 +205,7 @@ func (s *TokenServer) handleTokenRequest(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(map[string]string{
 		"access_token": response.AccessToken,
 		"token_type":   response.TokenType,
-		"source":       "idp",
+		"scope":        response.Scope,
+		"expires_in":   fmt.Sprintf("%d", response.ExpiresIn),
 	})
 }

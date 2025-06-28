@@ -61,6 +61,7 @@ func createTokenRequestHandler(idpClient *idp.Client, log *logger.Logger) nats.M
 			request.RequestID,
 			tokenResp.AccessToken,
 			tokenResp.TokenType,
+			tokenResp.Scope,
 			tokenResp.ExpiresIn,
 		)
 

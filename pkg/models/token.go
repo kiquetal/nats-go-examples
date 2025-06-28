@@ -29,13 +29,15 @@ type TokenResponse struct {
 	ExpiresIn   int       `json:"expires_in"`
 	Error       string    `json:"error,omitempty"`
 	Timestamp   time.Time `json:"timestamp"`
+	Scope       string    `json:"scope,omitempty"`
 }
 
 // NewTokenResponse creates a new token response
-func NewTokenResponse(requestID, accessToken, tokenType string, expiresIn int) *TokenResponse {
+func NewTokenResponse(requestID, accessToken, tokenType, scope string, expiresIn int) *TokenResponse {
 	return &TokenResponse{
 		RequestID:   requestID,
 		AccessToken: accessToken,
+		Scope:       scope,
 		TokenType:   tokenType,
 		ExpiresIn:   expiresIn,
 		Timestamp:   time.Now(),
