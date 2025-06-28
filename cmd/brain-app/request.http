@@ -4,7 +4,7 @@ POST http://localhost:8080/token
 Content-Type: application/json
 
 {
-  "client_id": "my-client",
-  "client_secret": "my-secret"
+  "client_id": "app-ring-tone3",
+  "client_secret": "P9uPa8dIdhVqepCI7qrcOuKri5KjMVuY"
 }
 

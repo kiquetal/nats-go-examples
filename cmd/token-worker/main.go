@@ -41,6 +41,7 @@ func createTokenRequestHandler(idpClient *idp.Client, log *logger.Logger) nats.M
 		credentials := &idp.ClientCredentials{
 			ClientID:     request.ClientID,
 			ClientSecret: request.ClientSecret,
+			Scope:        "openid profile",
 		}
 
 		var response *models.TokenResponse
@@ -48,7 +49,7 @@ func createTokenRequestHandler(idpClient *idp.Client, log *logger.Logger) nats.M
 		// Obtain token from IDP
 		// For development/testing, use the simulation method
 		// In production, use the real method: idpClient.GetTokenWithClientCredentials
-		tokenResp, err := idpClient.SimulateTokenRetrieval(credentials)
+		tokenResp, err := idpClient.GetTokenWithClientCredentials(credentials)
 		if err != nil {
 			log.Error("Failed to obtain token: %v", err)
 			sendErrorResponse(msg, request.RequestID, err.Error())
