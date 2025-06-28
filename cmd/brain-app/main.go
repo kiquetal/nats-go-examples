@@ -107,6 +107,12 @@ func (s *TokenServer) handleTokenRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Check for query param to skip cache
+	skipCache := false
+	if v := r.URL.Query().Get("skip_cache"); v == "1" || v == "true" {
+		skipCache = true
+	}
+
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -130,18 +136,20 @@ func (s *TokenServer) handleTokenRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Check cache first
-	if token, found := s.tokenCache.Get(creds.ClientID); found {
-		s.log.Info("Serving cached token for client ID: %s", creds.ClientID)
+	// Check cache first, unless skipCache is set
+	if !skipCache {
+		if token, found := s.tokenCache.Get(creds.ClientID); found {
+			s.log.Info("Serving cached token for client ID: %s", creds.ClientID)
 
-		// Return cached token
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"access_token": token,
-			"token_type":   "Bearer",
-			"source":       "cache",
-		})
-		return
+			// Return cached token
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{
+				"access_token": token,
+				"token_type":   "Bearer",
+				"source":       "cache",
+			})
+			return
+		}
 	}
 
 	// Create token request
@@ -186,9 +194,11 @@ func (s *TokenServer) handleTokenRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Cache the token for future use
-	s.tokenCache.Set(creds.ClientID, response.AccessToken, defaultTokenTTL)
-	s.log.Info("Token cached for client ID: %s", creds.ClientID)
+	// Cache the token for future use, unless skipCache is set
+	if !skipCache {
+		s.tokenCache.Set(creds.ClientID, response.AccessToken, defaultTokenTTL)
+		s.log.Info("Token cached for client ID: %s", creds.ClientID)
+	}
 
 	// Return token to client
 	w.Header().Set("Content-Type", "application/json")

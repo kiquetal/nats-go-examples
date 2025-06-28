@@ -1,6 +1,6 @@
 ### Example HTTP request for /token endpoint
 
-POST http://localhost:8080/token
+POST http://localhost:8080/token?skip_cache=true
 Content-Type: application/json
 
 {
