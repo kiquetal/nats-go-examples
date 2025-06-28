@@ -1,0 +1,10 @@
+### Example HTTP request for /token endpoint
+
+POST http://localhost:8080/token
+Content-Type: application/json
+
+{
+  "client_id": "my-client",
+  "client_secret": "my-secret"
+}
+
